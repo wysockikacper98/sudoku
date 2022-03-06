@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class SudokuScreen extends StatefulWidget {
@@ -11,25 +12,28 @@ class SudokuScreen extends StatefulWidget {
 
 class _SudokuScreenState extends State<SudokuScreen> {
   late String _sudokuToSolve;
-  late String _solvedSudoku;
+  // late String _solvedSudoku;
+  int? _selectedSquareIndex;
 
   @override
   void initState() {
     super.initState();
+    if (kDebugMode) {
+      print('SudokuScreen initState');
+    }
     _sudokuToSolve =
-    '.1...79..........5..54..6..5...8..9146.......9...4...8...965827........6...72.14.';
-    _solvedSudoku =
-    '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
+        '.1...79..........5..54..6..5...8..9146.......9...4...8...965827........6...72.14.';
+    // _solvedSudoku =
+    //     '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
   }
 
   @override
   Widget build(BuildContext context) {
-    print('build -> SudokuScreen');
+    if (kDebugMode) {
+      print('build -> SudokuScreen');
+    }
     List<String> _sudokuList = createSudokuToSolve();
-    final double _width = MediaQuery
-        .of(context)
-        .size
-        .width;
+    final double _width = MediaQuery.of(context).size.width;
 
     return Scaffold(
       appBar: AppBar(
@@ -48,9 +52,11 @@ class _SudokuScreenState extends State<SudokuScreen> {
   }
 
   Padding buildSudokuBoard(List<String> _sudokuList, BuildContext context) {
-    print('build -> buildSudokuBoard');
+    if (kDebugMode) {
+      print('build -> buildSudokuBoard');
+    }
 
-    int _index = -1;
+    int _index = 0;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -59,26 +65,30 @@ class _SudokuScreenState extends State<SudokuScreen> {
         shrinkWrap: true,
         crossAxisCount: 9,
         children: _sudokuList.map((number) {
-          _index++;
+          int elementIndex = _index++;
 
           return GestureDetector(
-            key: GlobalKey(debugLabel: _index.toString()),
+            key: GlobalKey(debugLabel: elementIndex.toString()),
             child: Container(
               decoration: BoxDecoration(
-                border: buildBorder(_index),
+                border: buildBorder(elementIndex),
+                color: buildColor(elementIndex),
               ),
               child: Center(
                 child: Text(
                   number == '.' ? ' ' : number,
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .headline5,
+                  style: Theme.of(context).textTheme.headline5,
                 ),
               ),
             ),
             onTap: () {
-              print('Selected Square: $_index and my number is: $number');
+              setState(() {
+                _selectedSquareIndex = elementIndex;
+              });
+              if (kDebugMode) {
+                print('Selected Square: $elementIndex'
+                    ' and my number is: $number');
+              }
             },
           );
         }).toList(),
@@ -100,8 +110,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
 
     return Border(
       top: (index < 9 ||
-          (index > 26 && index < 36) ||
-          (index > 53 && index < 63))
+              (index > 26 && index < 36) ||
+              (index > 53 && index < 63))
           ? _borderActive
           : _borderDeactivate,
       bottom: (index > 71 && index < 82) ? _borderActive : _borderDeactivate,
@@ -113,38 +123,71 @@ class _SudokuScreenState extends State<SudokuScreen> {
   }
 
   Row buildInputNumbers(double _width) {
-    print('build -> buildSudokuBoard');
+    if (kDebugMode) {
+      print('build -> buildSudokuBoard');
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: List.generate(
         9,
-            (index) =>
-            Container(
-              width: _width / 12,
-              height: _width / 8,
-              decoration: const BoxDecoration(
-                color: Colors.blueAccent,
-                borderRadius: BorderRadius.all(
-                  Radius.circular(20),
-                ),
-              ),
-              child: GestureDetector(
-                child: Center(
-                  child: Text(
-                    (index + 1).toString(),
-                    style: const TextStyle(fontSize: 34),
-                  ),
-                ),
-                onTap: () {
-                  print(index + 1);
-                },
+        (index) => Container(
+          width: _width / 12,
+          height: _width / 8,
+          decoration: const BoxDecoration(
+            color: Colors.blueAccent,
+            borderRadius: BorderRadius.all(
+              Radius.circular(20),
+            ),
+          ),
+          child: GestureDetector(
+            child: Center(
+              child: Text(
+                (index + 1).toString(),
+                style: const TextStyle(fontSize: 34),
               ),
             ),
+            onTap: _selectedSquareIndex == null ||
+                    _sudokuToSolve[_selectedSquareIndex!] != '.'
+                ? null
+                : () {
+                    setState(() {
+                      _sudokuToSolve = replaceCharAt(
+                        _sudokuToSolve,
+                        _selectedSquareIndex!,
+                        (index + 1).toString(),
+                      );
+                    });
+                  },
+          ),
+        ),
       ),
     );
   }
 
+  String replaceCharAt(String oldString, int index, String newChar) {
+    return oldString.substring(0, index) +
+        newChar +
+        oldString.substring(index + 1);
+  }
+
   List<String> createSudokuToSolve() {
     return _sudokuToSolve.split("");
+  }
+
+  Color buildColor(int index) {
+    if (_selectedSquareIndex == null) {
+      return Colors.transparent;
+    } else if (_selectedSquareIndex == index) {
+      return Colors.blueAccent;
+    } else if (_selectedSquareIndex! % 9 == index % 9 ||
+        index >= (_selectedSquareIndex! - _selectedSquareIndex! % 9) &&
+            index <= (_selectedSquareIndex! + 8 - _selectedSquareIndex! % 9)) {
+      return Colors.blueAccent.withAlpha(100);
+    } else if (_sudokuToSolve[_selectedSquareIndex!] != '.' &&
+        _sudokuToSolve[_selectedSquareIndex!] == _sudokuToSolve[index]) {
+      return Colors.blueGrey;
+    } else {
+      return Colors.transparent;
+    }
   }
 }
