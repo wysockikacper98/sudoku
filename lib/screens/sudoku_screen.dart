@@ -1,18 +1,23 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 
 class SudokuScreen extends StatefulWidget {
-  const SudokuScreen({Key? key}) : super(key: key);
-
   static const routeName = '/sudoku';
+
+  const SudokuScreen({Key? key}) : super(key: key);
 
   @override
   State<SudokuScreen> createState() => _SudokuScreenState();
 }
 
-class _SudokuScreenState extends State<SudokuScreen> {
-  late String _sudokuToSolve;
-  // late String _solvedSudoku;
+class _SudokuScreenState extends State<SudokuScreen>
+    with SingleTickerProviderStateMixin {
+  late String _sudokuEnteredByUser;
+  late final String _sudokuToSolve;
+  late final String _solvedSudoku;
+  late double _healthPoint;
+
   int? _selectedSquareIndex;
 
   @override
@@ -21,10 +26,11 @@ class _SudokuScreenState extends State<SudokuScreen> {
     if (kDebugMode) {
       print('SudokuScreen initState');
     }
-    _sudokuToSolve =
+    _sudokuToSolve = _sudokuEnteredByUser =
         '.1...79..........5..54..6..5...8..9146.......9...4...8...965827........6...72.14.';
-    // _solvedSudoku =
-    //     '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
+    _solvedSudoku =
+        '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
+    _healthPoint = 3;
   }
 
   @override
@@ -38,11 +44,20 @@ class _SudokuScreenState extends State<SudokuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sudoku'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.restart_alt),
+            onPressed: () {
+              _sudokuEnteredByUser = _sudokuToSolve;
+            },
+          ),
+        ],
       ),
       body: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          buildHealthPoints(),
           buildSudokuBoard(_sudokuList, context),
           const SizedBox(height: 16),
           buildInputNumbers(_width),
@@ -51,11 +66,44 @@ class _SudokuScreenState extends State<SudokuScreen> {
     );
   }
 
+  void takeDamage() {
+    setState(() {
+      _healthPoint--;
+    });
+    if (_healthPoint == 0) {
+      showDialog(context: context, builder: (_) => buildAlertDialog());
+    }
+  }
+
+  AlertDialog buildAlertDialog() {
+    return AlertDialog(
+      title: const Text('GAME OVER'),
+      content: const Text('You make to many mistakes. Better luck next time.'),
+      actions: [
+        TextButton(
+          child: const Text('Restart puzzle'),
+          onPressed: () {
+            setState(() {
+              _healthPoint = 3;
+              _sudokuEnteredByUser = _sudokuToSolve;
+            });
+            Navigator.of(context).pop();
+          },
+        ),
+        TextButton(
+          child: const Text('Quit'),
+          onPressed: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        ),
+      ],
+    );
+  }
+
   Padding buildSudokuBoard(List<String> _sudokuList, BuildContext context) {
     if (kDebugMode) {
       print('build -> buildSudokuBoard');
     }
-
     int _index = 0;
 
     return Padding(
@@ -67,6 +115,9 @@ class _SudokuScreenState extends State<SudokuScreen> {
         children: _sudokuList.map((number) {
           int elementIndex = _index++;
 
+          var staticNumbers = Theme.of(context).textTheme.headline5?.copyWith();
+          var addedNumbers = staticNumbers?.copyWith(color: Colors.blue);
+
           return GestureDetector(
             key: GlobalKey(debugLabel: elementIndex.toString()),
             child: Container(
@@ -77,7 +128,9 @@ class _SudokuScreenState extends State<SudokuScreen> {
               child: Center(
                 child: Text(
                   number == '.' ? ' ' : number,
-                  style: Theme.of(context).textTheme.headline5,
+                  style: number == _sudokuToSolve[elementIndex]
+                      ? staticNumbers
+                      : addedNumbers,
                 ),
               ),
             ),
@@ -147,16 +200,21 @@ class _SudokuScreenState extends State<SudokuScreen> {
               ),
             ),
             onTap: _selectedSquareIndex == null ||
-                    _sudokuToSolve[_selectedSquareIndex!] != '.'
+                    _sudokuEnteredByUser[_selectedSquareIndex!] != '.'
                 ? null
                 : () {
-                    setState(() {
-                      _sudokuToSolve = replaceCharAt(
-                        _sudokuToSolve,
-                        _selectedSquareIndex!,
-                        (index + 1).toString(),
-                      );
-                    });
+                    if (_solvedSudoku[_selectedSquareIndex!] ==
+                        (index + 1).toString()) {
+                      setState(() {
+                        _sudokuEnteredByUser = replaceCharAt(
+                          _sudokuEnteredByUser,
+                          _selectedSquareIndex!,
+                          (index + 1).toString(),
+                        );
+                      });
+                    } else {
+                      takeDamage();
+                    }
                   },
           ),
         ),
@@ -171,23 +229,47 @@ class _SudokuScreenState extends State<SudokuScreen> {
   }
 
   List<String> createSudokuToSolve() {
-    return _sudokuToSolve.split("");
+    return _sudokuEnteredByUser.split("");
   }
 
   Color buildColor(int index) {
     if (_selectedSquareIndex == null) {
       return Colors.transparent;
     } else if (_selectedSquareIndex == index) {
-      return Colors.blueAccent;
+      return Colors.black54;
     } else if (_selectedSquareIndex! % 9 == index % 9 ||
         index >= (_selectedSquareIndex! - _selectedSquareIndex! % 9) &&
             index <= (_selectedSquareIndex! + 8 - _selectedSquareIndex! % 9)) {
-      return Colors.blueAccent.withAlpha(100);
-    } else if (_sudokuToSolve[_selectedSquareIndex!] != '.' &&
-        _sudokuToSolve[_selectedSquareIndex!] == _sudokuToSolve[index]) {
+      return Colors.black26;
+    } else if (_sudokuEnteredByUser[_selectedSquareIndex!] != '.' &&
+        _sudokuEnteredByUser[_selectedSquareIndex!] ==
+            _sudokuEnteredByUser[index]) {
       return Colors.blueGrey;
     } else {
       return Colors.transparent;
     }
+  }
+
+  Widget buildHealthPoints() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: RatingBar.builder(
+        initialRating: _healthPoint,
+        minRating: 0,
+        direction: Axis.horizontal,
+        allowHalfRating: false,
+        itemCount: 3,
+        itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+        itemBuilder: (_, __) => const Icon(
+          Icons.favorite,
+          color: Colors.red,
+        ),
+        onRatingUpdate: (double value) {
+          if (kDebugMode) {
+            print('New health points: $value');
+          }
+        },
+      ),
+    );
   }
 }
