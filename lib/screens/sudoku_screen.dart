@@ -1,3 +1,4 @@
+import 'package:badges/badges.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
@@ -18,6 +19,8 @@ class _SudokuScreenState extends State<SudokuScreen>
   late final String _solvedSudoku;
   late double _healthPoint;
 
+  late int _hintAmount;
+
   int? _selectedSquareIndex;
 
   @override
@@ -31,6 +34,7 @@ class _SudokuScreenState extends State<SudokuScreen>
     _solvedSudoku =
         '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
     _healthPoint = 3;
+    _hintAmount = 3;
   }
 
   @override
@@ -251,24 +255,62 @@ class _SudokuScreenState extends State<SudokuScreen>
   }
 
   Widget buildHealthPoints() {
+    bool isHintInactive = _hintAmount < 1 ||
+        _selectedSquareIndex == null ||
+        _sudokuEnteredByUser[_selectedSquareIndex!] != '.';
+
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0),
-      child: RatingBar.builder(
-        initialRating: _healthPoint,
-        minRating: 0,
-        direction: Axis.horizontal,
-        allowHalfRating: false,
-        itemCount: 3,
-        itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-        itemBuilder: (_, __) => const Icon(
-          Icons.favorite,
-          color: Colors.red,
-        ),
-        onRatingUpdate: (double value) {
-          if (kDebugMode) {
-            print('New health points: $value');
-          }
-        },
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            flex: 1,
+            child: Container(),
+          ),
+          RatingBar.builder(
+            initialRating: _healthPoint,
+            minRating: 0,
+            direction: Axis.horizontal,
+            allowHalfRating: false,
+            itemCount: 3,
+            itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+            itemBuilder: (_, __) => const Icon(
+              Icons.favorite,
+              color: Colors.red,
+            ),
+            onRatingUpdate: (double value) {
+              if (kDebugMode) {
+                print('New health points: $value');
+              }
+            },
+          ),
+          Expanded(
+            flex: 1,
+            child: Badge(
+              alignment: Alignment.centerRight,
+              badgeContent: Text(_hintAmount.toString()),
+              child: IconButton(
+                icon: Icon(
+                  Icons.lightbulb,
+                  size: 32.0,
+                  color: isHintInactive ? Colors.white : Colors.yellow,
+                ),
+                onPressed: isHintInactive
+                    ? null
+                    : () {
+                        setState(() {
+                          _hintAmount--;
+                          _sudokuEnteredByUser = replaceCharAt(
+                              _sudokuEnteredByUser,
+                              _selectedSquareIndex!,
+                              _solvedSudoku[_selectedSquareIndex!]);
+                        });
+                      },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
