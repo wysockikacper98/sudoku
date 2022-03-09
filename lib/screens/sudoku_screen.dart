@@ -2,6 +2,7 @@ import 'package:badges/badges.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:stop_watch_timer/stop_watch_timer.dart';
 
 class SudokuScreen extends StatefulWidget {
   static const routeName = '/sudoku';
@@ -23,6 +24,14 @@ class _SudokuScreenState extends State<SudokuScreen>
 
   int? _selectedSquareIndex;
 
+  late StopWatchTimer _timer;
+
+  @override
+  void dispose() async {
+    super.dispose();
+    await _timer.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -30,11 +39,15 @@ class _SudokuScreenState extends State<SudokuScreen>
       print('SudokuScreen initState');
     }
     _sudokuToSolve = _sudokuEnteredByUser =
-        '.1...79..........5..54..6..5...8..9146.......9...4...8...965827........6...72.14.';
+        // '.1...79..........5..54..6..5...8..9146.......9...4...8...965827........6...72.14.';
+        '..2657984684291375795438612527386491468179253931542768143965827279814536856723149';
     _solvedSudoku =
         '312657984684291375795438612527386491468179253931542768143965827279814536856723149';
     _healthPoint = 3;
     _hintAmount = 3;
+
+    _timer = StopWatchTimer(mode: StopWatchMode.countUp);
+    _timer.onExecute.add(StopWatchExecute.start);
   }
 
   @override
@@ -52,7 +65,11 @@ class _SudokuScreenState extends State<SudokuScreen>
           IconButton(
             icon: const Icon(Icons.restart_alt),
             onPressed: () {
-              _sudokuEnteredByUser = _sudokuToSolve;
+              setState(() {
+                _sudokuEnteredByUser = _sudokuToSolve;
+                _timer.onExecute.add(StopWatchExecute.reset);
+                _timer.onExecute.add(StopWatchExecute.start);
+              });
             },
           ),
         ],
@@ -61,11 +78,17 @@ class _SudokuScreenState extends State<SudokuScreen>
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          buildHealthPoints(),
+          buildInfo(),
           buildSudokuBoard(_sudokuList, context),
           const SizedBox(height: 16),
           buildInputNumbers(_width),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.star),
+        onPressed: () {
+          _timer.onExecute.add(StopWatchExecute.stop);
+        },
       ),
     );
   }
@@ -80,6 +103,7 @@ class _SudokuScreenState extends State<SudokuScreen>
   }
 
   AlertDialog buildAlertDialog() {
+    _timer.onExecute.add(StopWatchExecute.stop);
     return AlertDialog(
       title: const Text('GAME OVER'),
       content: const Text('You make to many mistakes. Better luck next time.'),
@@ -90,6 +114,9 @@ class _SudokuScreenState extends State<SudokuScreen>
             setState(() {
               _healthPoint = 3;
               _sudokuEnteredByUser = _sudokuToSolve;
+
+              _timer.onExecute.add(StopWatchExecute.reset);
+              _timer.onExecute.add(StopWatchExecute.start);
             });
             Navigator.of(context).pop();
           },
@@ -216,6 +243,9 @@ class _SudokuScreenState extends State<SudokuScreen>
                           (index + 1).toString(),
                         );
                       });
+                      if (!_sudokuEnteredByUser.contains('.')) {
+                        finishGame();
+                      }
                     } else {
                       takeDamage();
                     }
@@ -224,6 +254,19 @@ class _SudokuScreenState extends State<SudokuScreen>
         ),
       ),
     );
+  }
+
+  void finishGame() {
+    showDialog(
+      context: context,
+      builder: (_) => buildGameFinishedAlert(
+        StopWatchTimer.getDisplayTime(
+          _timer.rawTime.value,
+          milliSecond: false,
+        ),
+      ),
+    );
+    _timer.onExecute.add(StopWatchExecute.stop);
   }
 
   String replaceCharAt(String oldString, int index, String newChar) {
@@ -254,7 +297,7 @@ class _SudokuScreenState extends State<SudokuScreen>
     }
   }
 
-  Widget buildHealthPoints() {
+  Widget buildInfo() {
     bool isHintInactive = _hintAmount < 1 ||
         _selectedSquareIndex == null ||
         _sudokuEnteredByUser[_selectedSquareIndex!] != '.';
@@ -266,7 +309,7 @@ class _SudokuScreenState extends State<SudokuScreen>
         children: [
           Expanded(
             flex: 1,
-            child: Container(),
+            child: buildTimer(),
           ),
           RatingBar.builder(
             initialRating: _healthPoint,
@@ -312,6 +355,46 @@ class _SudokuScreenState extends State<SudokuScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget buildTimer() {
+    return StreamBuilder(
+      stream: _timer.rawTime,
+      initialData: 0,
+      builder: (_, AsyncSnapshot snap) {
+        return Text(
+          StopWatchTimer.getDisplayTime(snap.data, milliSecond: false),
+        );
+      },
+    );
+  }
+
+  Widget buildGameFinishedAlert(String rawTime) {
+    return AlertDialog(
+      title: const Text('Congratulations'),
+      content: Text('You finished sudoku in time: $rawTime'),
+      actions: [
+        TextButton(
+          child: const Text('Restart puzzle'),
+          onPressed: () {
+            setState(() {
+              _healthPoint = 3;
+              _sudokuEnteredByUser = _sudokuToSolve;
+
+              _timer.onExecute.add(StopWatchExecute.reset);
+              _timer.onExecute.add(StopWatchExecute.start);
+            });
+            Navigator.of(context).pop();
+          },
+        ),
+        TextButton(
+          child: const Text('Quit'),
+          onPressed: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        ),
+      ],
     );
   }
 }
